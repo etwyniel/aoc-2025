@@ -1,0 +1,12 @@
+[package]
+name = "aoc-2025"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.100"
+aoc-framework = {git = "https://github.com/etwyniel/aoc-framework"}
+itertools = "0.10.5"
+
+[profile.release]
+lto = true
