@@ -5,7 +5,7 @@ mod day01;
 mod day02;
 mod day03;
 
-fn main() -> anyhow::Result<()> {
+fn main() {
     let days = [day01::Day01::run, day02::Day02::run, day03::Day03::run];
 
     let token = std::env::var("AOC_TOKEN").ok();
@@ -16,12 +16,10 @@ fn main() -> anyhow::Result<()> {
         .and_then(|day| days.get(day - 1))
     {
         day(token.as_deref());
-        return Ok(());
+        return;
     }
 
     for day in days {
         day(token.as_deref());
     }
-
-    Ok(())
 }
