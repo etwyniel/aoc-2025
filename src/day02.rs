@@ -1,10 +1,11 @@
 use std::ops::RangeInclusive;
+use rayon::prelude::*;
 
 use aoc_framework::*;
 
 pub struct Day02;
 
-impl_day!(Day02::{part1, part2}: 2025[02], r"
+impl_day!(Day02::{part1, part2}: 2025[2], r"
 11-22,95-115,998-1012,1188511880-1188511890,222220-222224,1698522-1698528,446443-446449,38593856-38593862,565653-565659,824824821-824824827,2121212118-2121212124
 ");
 
@@ -15,7 +16,7 @@ fn parse(input: &str) -> impl Iterator<Item = RangeInclusive<u64>> {
             range
                 .trim()
                 .split('-')
-                .flat_map(|s| s.parse().ok())
+                .filter_map(|s| s.parse().ok())
                 .tuples()
                 .next()
         })
@@ -34,6 +35,7 @@ fn decimal_len(mut n: u64) -> u32 {
 #[aoc(part = 1, example = 1227775554)]
 fn part1(input: &str) -> u64 {
     parse(input)
+        .collect::<Vec<_>>().into_par_iter()
         .map(|range| {
             let start_len = decimal_len(*range.start());
             let end_len = decimal_len(*range.end());
@@ -58,6 +60,8 @@ fn part1(input: &str) -> u64 {
 #[aoc(part = 2, example = 4174379265)]
 fn part2(input: &str) -> u64 {
     parse(input)
+        .collect::<Vec<_>>()
+        .into_par_iter()
         .map(|range| {
             let start_len = decimal_len(*range.start());
             let end_len = decimal_len(*range.end());

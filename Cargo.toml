@@ -8,6 +8,7 @@ anyhow = "1.0.100"
 aoc-framework = {git = "https://github.com/etwyniel/aoc-framework"}
 itertools = "0.10.5"
 libc = "0.2.177"
+rayon = "1.11.0"
 
 [build-dependencies]
 cc = "1.2.48"
