@@ -1,4 +1,4 @@
-use std::{collections::HashSet, ops::RangeInclusive};
+use std::{collections::BTreeSet, ops::RangeInclusive};
 
 use aoc_framework::bcd::Bcd;
 use aoc_framework::*;
@@ -44,7 +44,7 @@ fn solve<const PART2: bool>(input: &str) -> u64 {
                     (len, check_range)
                 })
                 .map(|(len, check_range)| {
-                    let mut ids = HashSet::<u64>::new();
+                    let mut ids = BTreeSet::<u64>::new();
                     let start = *check_range.start();
                     let end = *check_range.end();
                     let start_bin: u64 = start.into();
