@@ -34,23 +34,24 @@ fn part2(input: Vec<String>) -> u64 {
     let mut g = Grid::from_lines(input, |b| b == b'@');
     let mut removed = 0;
     loop {
-        let removable = g
-            .points_iter()
-            .filter(|&p| g[p])
-            .filter(|p| {
-                p.neighbors_diag()
+        let mut found = false;
+        for p in g.points_iter() {
+            if !g[p]
+                || p.neighbors_diag()
                     .filter(|&n| g.get(n) == Some(&true))
+                    .take(4)
                     .count()
-                    < 4
-            })
-            .collect::<Vec<_>>();
-        if removable.is_empty() {
+                    >= 4
+            {
+                continue;
+            }
+            g.set(p, false);
+            removed += 1;
+            found = true
+        }
+        if !found {
             break;
         }
-        removed += removable.len() as u64;
-        removable.into_iter().for_each(|p| {
-            g.set(p, false);
-        })
     }
     removed
 }
