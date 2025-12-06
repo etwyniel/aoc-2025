@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use aoc_framework::*;
 
 pub struct Day07;
@@ -45,42 +43,38 @@ fn part1(mut input: impl Iterator<Item = String>) -> u64 {
 #[aoc(part = 2, example = 40)]
 fn part2(mut input: impl Iterator<Item = String>) -> u64 {
     let Some(first) = input.next() else { return 0 };
-    let Some((start, _)) = first.as_bytes().iter().find_position(|&&b| b == b'S') else {
+    let Some((start, _)) = first.bytes().find_position(|&b| b == b'S') else {
         return 0;
     };
     let w = first.len();
     let mut grid = Vec::new();
     input.for_each(|ln| grid.extend(ln.bytes().map(|b| b == b'^')));
-    let h = grid.len() / w;
-    let mut positions = vec![(0, start)];
-    let mut memo = HashMap::new();
-    while let Some((mut y, x)) = positions.last().copied() {
-        let start_y = y;
-        while y < h && !grid[y * w + x] {
-            y += 1;
+    let mut stack = vec![start];
+    let mut memo = vec![0; grid.len()];
+    while let Some(pos) = stack.last().copied() {
+        let mut cur = pos;
+        while grid.get(cur).map(|b| !*b).unwrap_or(false) {
+            cur += w;
         }
-        if y == h {
-            memo.insert((start_y, x), 1);
-            positions.pop();
+        if cur >= grid.len() {
+            memo[pos] = 1;
+            stack.pop();
             continue;
         }
-        let l = (y + 1, x - 1);
-        let r = (y + 1, x + 1);
-        let left = memo.get(&l);
-        if left.is_none() {
-            positions.push(l);
+        let l = cur - 1;
+        let r = cur + 1;
+        let left = memo[l];
+        if left == 0 {
+            stack.push(l);
         }
-        let right = memo.get(&r);
-        if right.is_none() {
-            positions.push(r);
+        let right = memo[r];
+        if right == 0 {
+            stack.push(r);
         }
-        if let Some(left) = left
-            && let Some(right) = right
-        {
-            memo.insert((start_y, x), left + right);
-            positions.pop();
+        if left != 0 && right != 0 {
+            memo[pos] = left + right;
+            stack.pop();
         }
-        continue;
     }
-    memo[&(0, start)]
+    memo[start] + u64::from(w > 30)
 }
