@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, time::Instant};
+use std::collections::BTreeMap;
 
 use aoc_framework::*;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -28,25 +28,6 @@ impl_day!(Day08::{part1, part2}: 2025[8], r"
 425,690,689
 ");
 
-#[derive(PartialEq, Eq)]
-struct Distance {
-    i: usize,
-    j: usize,
-    dist: i64,
-}
-
-impl PartialOrd for Distance {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.dist.partial_cmp(&other.dist)
-    }
-}
-
-impl Ord for Distance {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.dist.cmp(&other.dist)
-    }
-}
-
 fn solve<const PART2: bool>(input: impl Iterator<Item = String>) -> u64 {
     let points: Vec<(i64, i64, i64)> = input
         .map(|ln| {
@@ -65,8 +46,7 @@ fn solve<const PART2: bool>(input: impl Iterator<Item = String>) -> u64 {
         .map(|i| {
             let mut v = Vec::with_capacity(len);
             let (ix, iy, iz) = points[i];
-            for j in (i + 1)..len {
-                let (jx, jy, jz) = points[j];
+            for (j, (jx, jy, jz)) in points.iter().enumerate().skip(i + 1).take(len) {
                 let dist = (ix - jx).pow(2) + (iy - jy).pow(2) + (iz - jz).pow(2);
                 v.push((j, dist));
             }
@@ -74,10 +54,10 @@ fn solve<const PART2: bool>(input: impl Iterator<Item = String>) -> u64 {
             v
         })
         .collect::<Vec<_>>();
-    let mut btree = BTreeSet::new();
-    for i in 0..len {
-        if let Some((j, dist)) = nearest[i].pop() {
-            btree.insert(Distance { i, j, dist });
+    let mut btree = BTreeMap::new();
+    for (i, nearest) in nearest.iter_mut().enumerate() {
+        if let Some((j, dist)) = nearest.pop() {
+            btree.insert(dist, (i, j));
         }
     }
     let target = if PART2 {
@@ -88,9 +68,9 @@ fn solve<const PART2: bool>(input: impl Iterator<Item = String>) -> u64 {
         1000
     };
     for _ in 0..target {
-        let Distance { i, j, .. } = btree.pop_first().unwrap();
+        let (_, (i, j)) = btree.pop_first().unwrap();
         if let Some((j, dist)) = nearest[i].pop() {
-            btree.insert(Distance { i, j, dist });
+            btree.insert(dist, (i, j));
         }
         if let (Some(c1), Some(c2)) = (pc[i], pc[j]) {
             if c1 != c2 {
@@ -117,7 +97,7 @@ fn solve<const PART2: bool>(input: impl Iterator<Item = String>) -> u64 {
         }
     }
     chains.sort_unstable();
-    return chains.into_iter().rev().take(3).product::<usize>() as u64;
+    chains.into_iter().rev().take(3).product::<usize>() as u64
 }
 
 #[aoc(part = 1, example = 40)]
