@@ -1,6 +1,7 @@
-use std::collections::HashSet;
+use std::{collections::BTreeSet, time::Instant};
 
 use aoc_framework::*;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 pub struct Day08;
 
@@ -27,61 +28,26 @@ impl_day!(Day08::{part1, part2}: 2025[8], r"
 425,690,689
 ");
 
-#[aoc(part = 1, example = 40)]
-fn part1(input: impl Iterator<Item = String>) -> u64 {
-    let points: Vec<(i64, i64, i64)> = input
-        .map(|ln| {
-            ln.split(',')
-                .map(|s| s.parse::<i64>().unwrap())
-                .tuples()
-                .next()
-                .unwrap()
-        })
-        .collect_vec();
-    let mut pc: Vec<Option<usize>> = vec![None; points.len()];
-    let target = if points.len() < 100 { 10 } else { 1000 };
-    let mut chains = Vec::new();
-    let len = points.len();
-    let mut pairs = HashSet::new();
-    for _ in 0..target {
-        let (i, j) = (0..len)
-            .flat_map(|i| ((i + 1)..len).filter(move |&j| j != i).map(move |j| (i, j)))
-            .filter(|pair| !pairs.contains(pair))
-            .min_by_key(|&(i, j)| {
-                ((points[i].0 - points[j].0).pow(2)
-                    + (points[i].1 - points[j].1).pow(2)
-                    + (points[i].2 - points[j].2).pow(2))
-                .isqrt()
-            })
-            .unwrap();
-        pairs.insert((i, j));
-        if let (Some(c1), Some(c2)) = (pc[i], pc[j]) {
-            if c1 != c2 {
-                let c = c1.min(c2);
-                let replaced = c1.max(c2);
-                pc.iter_mut()
-                    .filter(|p| **p == Some(replaced))
-                    .for_each(|p| *p = Some(c));
-                chains[c] += chains[replaced];
-                chains[replaced] = 0;
-            }
-            continue;
-        }
-        let c = pc[i].or(pc[j]).unwrap_or_else(|| {
-            let c = chains.len();
-            chains.push(0);
-            c
-        });
-        chains[c] += pc[i].is_none() as usize + pc[j].is_none() as usize;
-        pc[i] = Some(c);
-        pc[j] = Some(c);
-    }
-    chains.sort_unstable();
-    chains.into_iter().rev().take(3).product::<usize>() as u64
+#[derive(PartialEq, Eq)]
+struct Distance {
+    i: usize,
+    j: usize,
+    dist: i64,
 }
 
-#[aoc(part = 2, example = 25272)]
-fn part2(input: impl Iterator<Item = String>) -> u64 {
+impl PartialOrd for Distance {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.dist.partial_cmp(&other.dist)
+    }
+}
+
+impl Ord for Distance {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.dist.cmp(&other.dist)
+    }
+}
+
+fn solve<const PART2: bool>(input: impl Iterator<Item = String>) -> u64 {
     let points: Vec<(i64, i64, i64)> = input
         .map(|ln| {
             ln.split(',')
@@ -91,21 +57,41 @@ fn part2(input: impl Iterator<Item = String>) -> u64 {
                 .unwrap()
         })
         .collect_vec();
-    let mut pc: Vec<Option<usize>> = vec![None; points.len()];
-    let mut chains = Vec::new();
     let len = points.len();
-    let mut pairs = vec![false; len * len];
-    loop {
-        let (i, j) = (0..len)
-            .flat_map(|i| ((i + 1)..len).filter(move |&j| j != i).map(move |j| (i, j)))
-            .filter(|&(i, j)| !pairs[i * len + j])
-            .min_by_key(|&(i, j)| {
-                (points[i].0 - points[j].0).pow(2)
-                    + (points[i].1 - points[j].1).pow(2)
-                    + (points[i].2 - points[j].2).pow(2)
-            })
-            .unwrap();
-        pairs[i * len + j] = true;
+    let mut pc: Vec<Option<usize>> = vec![None; len];
+    let mut chains = Vec::new();
+    let mut nearest = (0..len)
+        .into_par_iter()
+        .map(|i| {
+            let mut v = Vec::with_capacity(len);
+            let (ix, iy, iz) = points[i];
+            for j in (i + 1)..len {
+                let (jx, jy, jz) = points[j];
+                let dist = (ix - jx).pow(2) + (iy - jy).pow(2) + (iz - jz).pow(2);
+                v.push((j, dist));
+            }
+            v.sort_unstable_by_key(|(_, dist)| -*dist);
+            v
+        })
+        .collect::<Vec<_>>();
+    let mut btree = BTreeSet::new();
+    for i in 0..len {
+        if let Some((j, dist)) = nearest[i].pop() {
+            btree.insert(Distance { i, j, dist });
+        }
+    }
+    let target = if PART2 {
+        usize::MAX
+    } else if points.len() < 100 {
+        10
+    } else {
+        1000
+    };
+    for _ in 0..target {
+        let Distance { i, j, .. } = btree.pop_first().unwrap();
+        if let Some((j, dist)) = nearest[i].pop() {
+            btree.insert(Distance { i, j, dist });
+        }
         if let (Some(c1), Some(c2)) = (pc[i], pc[j]) {
             if c1 != c2 {
                 let c = c1.min(c2);
@@ -115,9 +101,6 @@ fn part2(input: impl Iterator<Item = String>) -> u64 {
                     .for_each(|p| *p = Some(c));
                 chains[c] += chains[replaced];
                 chains[replaced] = 0;
-                if c == 0 {
-                    eprintln!("{}/{}", chains[0], points.len());
-                }
             }
         } else {
             let c = pc[i].or(pc[j]).unwrap_or_else(|| {
@@ -129,8 +112,20 @@ fn part2(input: impl Iterator<Item = String>) -> u64 {
             pc[i] = Some(c);
             pc[j] = Some(c);
         }
-        if chains[0] == points.len() {
+        if PART2 && chains[0] == points.len() {
             return (points[i].0 * points[j].0) as u64;
         }
     }
+    chains.sort_unstable();
+    return chains.into_iter().rev().take(3).product::<usize>() as u64;
+}
+
+#[aoc(part = 1, example = 40)]
+fn part1(input: impl Iterator<Item = String>) -> u64 {
+    solve::<false>(input)
+}
+
+#[aoc(part = 2, example = 25272)]
+fn part2(input: impl Iterator<Item = String>) -> u64 {
+    solve::<true>(input)
 }
