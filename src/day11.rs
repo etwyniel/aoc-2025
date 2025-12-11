@@ -94,11 +94,9 @@ fn part2(input: impl Iterator<Item = String>) -> u64 {
     let graph: Vec<Vec<usize>> = nodes
         .iter()
         .map(|(_, dsts)| {
-            let dsts = dsts
-                .split(' ')
+            dsts.split(' ')
                 .map(|dst| get_label(dst.into()))
-                .collect_vec();
-            dsts
+                .collect_vec()
         })
         .collect();
     let svr = get_label("svr".into());

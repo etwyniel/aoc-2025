@@ -29,7 +29,7 @@ fn prefix(start: Bcd, end: Bcd) -> Bcd {
             return start >> (i + 1);
         }
     }
-    return start;
+    start
 }
 
 fn solve<const PART2: bool>(input: &str) -> u64 {
@@ -37,7 +37,7 @@ fn solve<const PART2: bool>(input: &str) -> u64 {
         .map(|range| {
             let start_len = range.start().len();
             let end_len = range.end().len();
-            let res = (start_len..=end_len)
+            (start_len..=end_len)
                 .map(|len| {
                     let check_range = (Bcd::new(1) << (len - 1)).max(*range.start())
                         ..=(Bcd::new(9).repeat(len).min(*range.end()));
@@ -68,7 +68,7 @@ fn solve<const PART2: bool>(input: &str) -> u64 {
                             prefix << remaining_digits
                         }
                         .into();
-                        for n in 0..(10u32.pow(remaining_digits.max(0) as u32)) {
+                        for n in 0..(10u32.pow(remaining_digits)) {
                             let candidate = (prefix_part + n as u64) * mask;
                             if candidate < start_bin {
                                 continue;
@@ -82,8 +82,7 @@ fn solve<const PART2: bool>(input: &str) -> u64 {
                     }
                     ids.into_iter().sum::<u64>()
                 })
-                .sum::<u64>();
-            res
+                .sum::<u64>()
         })
         .sum()
 }

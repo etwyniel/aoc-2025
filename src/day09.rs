@@ -1,4 +1,4 @@
-use std::{cmp::max_by_key, fs::File, io::Write, ops::Add};
+use std::{fs::File, io::Write, ops::Add};
 
 use aoc_framework::*;
 

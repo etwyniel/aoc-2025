@@ -244,7 +244,7 @@ impl Solver {
                 ..Default::default()
             };
             glp_init_smcp(&mut params);
-            glp_simplex(p, &mut params);
+            glp_simplex(p, &params);
             glp_intopt(p, std::ptr::null());
             let res = glp_mip_obj_val(p);
             let mut total = 0;

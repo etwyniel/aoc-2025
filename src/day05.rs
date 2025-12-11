@@ -55,10 +55,10 @@ fn part1(mut input: impl Iterator<Item = String>) -> u64 {
         .filter(|num| {
             ranges
                 .binary_search_by(|range| {
-                    if range.contains(&num) {
+                    if range.contains(num) {
                         Ordering::Equal
                     } else {
-                        range.start().cmp(&num)
+                        range.start().cmp(num)
                     }
                 })
                 .is_ok()

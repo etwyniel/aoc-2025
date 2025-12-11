@@ -52,7 +52,7 @@ fn part2(input: impl Iterator<Item = String>) -> u64 {
                     if op == b'+' {
                         numbers.sum()
                     } else {
-                        numbers.fold(1, |l, r| l * r)
+                        numbers.product::<u64>()
                     }
                 })
                 .sum();
