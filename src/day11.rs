@@ -1,7 +1,6 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use aoc_framework::*;
-use libc::write;
 
 pub struct Day11;
 
@@ -46,8 +45,8 @@ impl Debug for Label {
     }
 }
 
-impl Label {
-    fn from_str(s: &str) -> Label {
+impl From<&str> for Label {
+    fn from(s: &str) -> Label {
         Label(s.bytes().take(3).fold(0, |acc, b| (acc << 8) | (b as u32)))
     }
 }
@@ -57,13 +56,13 @@ fn part1(input: impl Iterator<Item = String>) -> u64 {
     let graph: HashMap<Label, Vec<Label>> = input
         .map(|ln| {
             let (src, dsts) = ln.split_once(": ").unwrap();
-            let src = Label::from_str(src);
-            let dsts = dsts.split(' ').map(Label::from_str).collect_vec();
+            let src = Label::from(src);
+            let dsts = dsts.split(' ').map(Label::from).collect_vec();
             (src, dsts)
         })
         .collect();
-    let out = Label::from_str("out");
-    let mut stack = vec![Label::from_str("you")];
+    let out = Label::from("out");
+    let mut stack = vec![Label::from("you")];
     let mut paths = 0;
     while let Some(cur) = stack.pop() {
         if cur == out {
@@ -80,25 +79,37 @@ fn part1(input: impl Iterator<Item = String>) -> u64 {
 
 #[aoc(part = 2, example = 2)]
 fn part2(input: impl Iterator<Item = String>) -> u64 {
-    let graph: HashMap<Label, Vec<Label>> = input
+    let mut labels = HashMap::new();
+    let mut get_label = |label: Label| {
+        let len = labels.len();
+        *labels.entry(label).or_insert(len)
+    };
+    let nodes = input
         .map(|ln| {
             let (src, dsts) = ln.split_once(": ").unwrap();
-            let src = Label::from_str(src);
-            let dsts = dsts.split(' ').map(Label::from_str).collect_vec();
-            (src, dsts)
+            let src = get_label(src.into());
+            (src, dsts.to_string())
+        })
+        .collect_vec();
+    let graph: Vec<Vec<usize>> = nodes
+        .iter()
+        .map(|(_, dsts)| {
+            let dsts = dsts
+                .split(' ')
+                .map(|dst| get_label(dst.into()))
+                .collect_vec();
+            dsts
         })
         .collect();
-    let out = Label::from_str("out");
-    let fft = Label::from_str("fft");
-    let dac = Label::from_str("dac");
-    let mut memo = HashMap::new();
-    memo.insert(out, (1, 0, 0, 0));
-    let mut stack = vec![Label::from_str("svr")];
+    let svr = get_label("svr".into());
+    let out = get_label("out".into());
+    let fft = get_label("fft".into());
+    let dac = get_label("dac".into());
+    let mut memo = vec![None; labels.len()];
+    memo[out] = Some((1, 0, 0, 0));
+    let mut stack = vec![svr];
     while let Some(&cur) = stack.last() {
-        if cur == out {
-            continue;
-        }
-        let Some(next) = graph.get(&cur) else {
+        let Some(next) = graph.get(cur) else {
             continue;
         };
         let mut total = 0;
@@ -106,28 +117,29 @@ fn part2(input: impl Iterator<Item = String>) -> u64 {
         let mut with_dac = 0;
         let mut valid = 0;
         let mut all = true;
-        for n in next {
-            if let Some((ntotal, nwith_fft, nwith_dac, nvalid)) = memo.get(n) {
+        for &n in next {
+            if let Some((ntotal, nwith_fft, nwith_dac, nvalid)) = memo[n] {
                 total += ntotal;
                 with_fft += nwith_fft;
                 with_dac += nwith_dac;
                 valid += nvalid;
             } else {
-                stack.push(*n);
+                stack.push(n);
                 all = false;
             }
         }
-        if all {
-            if cur == fft {
-                valid += with_dac;
-                with_fft = total;
-            } else if cur == dac {
-                valid += with_fft;
-                with_dac = total;
-            }
-            stack.pop();
-            memo.insert(cur, (total, with_fft, with_dac, valid));
+        if !all {
+            continue;
         }
+        stack.pop();
+        if cur == fft {
+            valid += with_dac;
+            with_fft = total;
+        } else if cur == dac {
+            valid += with_fft;
+            with_dac = total;
+        }
+        memo[cur] = Some((total, with_fft, with_dac, valid));
     }
-    memo.get(&Label::from_str("svr")).unwrap().3
+    memo[svr].unwrap().3
 }
