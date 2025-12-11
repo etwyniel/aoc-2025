@@ -138,6 +138,7 @@ struct GlpSmcp {
     foo_bar: FooBar,
 }
 
+#[link(name = "glpk")]
 unsafe extern "C" {
     fn glp_create_prob() -> *mut GlpProb;
     fn glp_set_obj_dir(_: *mut GlpProb, _: c_int);
@@ -161,73 +162,110 @@ unsafe extern "C" {
     fn glp_mip_obj_val(_: *mut GlpProb) -> c_double;
     fn glp_term_out(_: c_int);
     fn glp_delete_prob(_: *mut GlpProb);
+    fn glp_erase_prob(_: *mut GlpProb);
 }
 
-fn solve(buttons: &[u128], len: usize, target: u128) -> u64 {
-    let len = len as c_int;
-    unsafe {
-        glp_term_out(0);
-        let p = glp_create_prob();
-        glp_set_obj_dir(p, 1);
+struct Solver {
+    p: *mut GlpProb,
+    ia: Vec<c_int>,
+    ja: Vec<c_int>,
+    ar: Vec<c_double>,
+}
 
-        glp_add_rows(p, len as c_int);
-        for i in (0..len).rev() {
-            let tgt = (target >> (i * 9)) & 0x1ff;
-            glp_set_row_bnds(p, len - i as c_int, 5, tgt as c_double, 0.);
+impl Drop for Solver {
+    fn drop(&mut self) {
+        unsafe {
+            glp_delete_prob(self.p);
         }
+    }
+}
 
-        glp_add_cols(p, buttons.len() as c_int);
-        let mut ia = vec![0];
-        let mut ja = vec![0];
-        let mut ar = vec![0.];
-        for (i, &b) in buttons.iter().enumerate() {
-            let ndx = i as c_int + 1;
-            glp_set_col_bnds(p, ndx, 2, 0., 0.);
-            glp_set_col_kind(p, ndx, 2);
-            glp_set_obj_coef(p, ndx, 1.);
+impl Solver {
+    fn new() -> Self {
+        let p = unsafe {
+            glp_term_out(0);
+            let p = glp_create_prob();
+            glp_set_obj_dir(p, 1);
+            p
+        };
+        Solver {
+            p,
+            ia: vec![0],
+            ja: vec![0],
+            ar: vec![0.],
+        }
+    }
 
-            for j in 0..len {
-                if (b >> ((len - j - 1) * 9)) & 0x1ff != 0 {
-                    ia.push(j as c_int + 1);
-                    ja.push(ndx);
-                    ar.push(1.);
+    fn reset(&mut self) {
+        unsafe {
+            glp_erase_prob(self.p);
+        }
+        self.ia.truncate(1);
+        self.ja.truncate(1);
+        self.ar.truncate(1);
+    }
+
+    fn solve(&mut self, buttons: &[u128], len: usize, target: u128) -> u64 {
+        let len = len as c_int;
+        unsafe {
+            self.reset();
+            let p = self.p;
+            glp_add_rows(p, len as c_int);
+            for i in (0..len).rev() {
+                let tgt = (target >> (i * 9)) & 0x1ff;
+                glp_set_row_bnds(p, len - i as c_int, 5, tgt as c_double, 0.);
+            }
+
+            glp_add_cols(p, buttons.len() as c_int);
+            for (i, &b) in buttons.iter().enumerate() {
+                let ndx = i as c_int + 1;
+                glp_set_col_bnds(p, ndx, 2, 0., 0.);
+                glp_set_col_kind(p, ndx, 2);
+                glp_set_obj_coef(p, ndx, 1.);
+
+                for j in 0..len {
+                    if (b >> ((len - j - 1) * 9)) & 0x1ff != 0 {
+                        self.ia.push(j as c_int + 1);
+                        self.ja.push(ndx);
+                        self.ar.push(1.);
+                    }
                 }
             }
-        }
 
-        glp_load_matrix(
-            p,
-            ia.len() as c_int - 1,
-            ia.as_ptr(),
-            ja.as_ptr(),
-            ar.as_ptr(),
-        );
-        let mut params = GlpSmcp {
-            meth: 3,
-            ..Default::default()
-        };
-        glp_init_smcp(&mut params);
-        glp_simplex(p, &params);
-        glp_intopt(p, std::ptr::null());
-        let res = glp_mip_obj_val(p);
-        let mut total = 0;
-        for (i, &b) in buttons.iter().enumerate() {
-            let col = glp_mip_col_val(p, i as c_int + 1);
-            total += col as u128 * b;
+            glp_load_matrix(
+                p,
+                self.ia.len() as c_int - 1,
+                self.ia.as_ptr(),
+                self.ja.as_ptr(),
+                self.ar.as_ptr(),
+            );
+            let mut params = GlpSmcp {
+                meth: 3,
+                ..Default::default()
+            };
+            glp_init_smcp(&mut params);
+            glp_simplex(p, &mut params);
+            glp_intopt(p, std::ptr::null());
+            let res = glp_mip_obj_val(p);
+            let mut total = 0;
+            for (i, &b) in buttons.iter().enumerate() {
+                let col = glp_mip_col_val(p, i as c_int + 1);
+                total += col as u128 * b;
+            }
+            assert_eq!(
+                print_value(target, len as usize),
+                print_value(total, len as usize)
+            );
+            res.round() as u64
         }
-        assert_eq!(
-            print_value(target, len as usize),
-            print_value(total, len as usize)
-        );
-        glp_delete_prob(p);
-        res.round() as u64
     }
 }
 
 #[aoc(part = 2, example = 33)]
 fn part2(input: impl Iterator<Item = String>) -> u64 {
+    let mut solver = Solver::new();
     input
         .map(|ln| parse_p2(&ln))
-        .map(|(target, len, buttons)| solve(&buttons, len, target))
+        .map(|(target, len, buttons)| solver.solve(&buttons, len, target))
         .sum()
 }
